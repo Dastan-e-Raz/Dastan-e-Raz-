@@ -7,6 +7,8 @@
     <!-- Firebase SDKs (Compat version for Firestore) -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <!-- Adsterra Social Bar Ad -->
+    <script src="https://pl29744814.profitableratecpmnetwork.com/92/29/ae/9229aebafaeada61d93beb47f1568ee0.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #121212; color: #e0e0e0; line-height: 1.8; }
@@ -38,7 +40,10 @@
         .back-btn { background: #ff9800; color: #000; border: none; padding: 8px 18px; font-weight: bold; border-radius: 4px; cursor: pointer; margin-bottom: 20px; }
         .story-text { white-space: pre-line; font-size: 17px; color: #dcdcdc; text-align: justify; margin-top: 15px; }
         
-        .share-box { margin-top: 30px; text-align: center; padding: 15px; background: #252525; border-radius: 6px; }
+        /* Ad Container */
+        .ad-container { margin: 25px 0; text-align: center; display: flex; justify-content: center; }
+
+        .share-box { margin-top: 20px; text-align: center; padding: 15px; background: #252525; border-radius: 6px; }
         .share-btn { background: #25D366; color: white; border: none; padding: 10px 20px; border-radius: 5px; font-size: 15px; font-weight: bold; cursor: pointer; }
 
         /* Custom Toast Notification */
@@ -84,6 +89,21 @@
         <div id="reader-view">
             <button class="back-btn" onclick="goHome()">← واپس جائیں</button>
             <div id="reader-content"></div>
+            
+            <!-- Banner Ad (320x50) Placed nicely inside story reader -->
+            <div class="ad-container">
+                <script>
+                  atOptions = {
+                    'key' : '90189c871ed62cb66716bfd097dfbff2',
+                    'format' : 'iframe',
+                    'height' : 50,
+                    'width' : 320,
+                    'params' : {}
+                  };
+                </script>
+                <script src="https://www.highrevenueformat.com/90189c871ed62cb66716bfd097dfbff2/invoke.js"></script>
+            </div>
+
             <div class="share-box">
                 <p>یہ داستان پسند آئی؟ دوستوں کے ساتھ شیئر کریں!</p>
                 <button class="share-btn" onclick="shareStory()">📤 واٹس ایپ پر شیئر کریں</button>
@@ -130,7 +150,6 @@
                 document.getElementById("loader").style.display = "none";
                 document.getElementById("list-view").style.display = "block";
 
-                // Check if URL has a specific story ID to open directly
                 const urlParams = new URLSearchParams(window.location.search);
                 const storyIdFromUrl = urlParams.get('story');
                 if (storyIdFromUrl) {
@@ -173,7 +192,6 @@
 
         function filterCategory(category) {
             closeSidebar();
-            // Clear URL param when switching categories
             if(history.pushState) {
                 history.pushState(null, null, window.location.pathname);
             }
@@ -209,7 +227,6 @@
                 window.history.pushState({path: newUrl}, '', newUrl);
             }
 
-            // Increment views in database secretly
             db.collection("stories").doc(id).update({
                 views: firebase.firestore.FieldValue.increment(1)
             }).catch(err => console.log(err));
