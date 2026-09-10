@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="ur" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>داستانِ راز - دلچسپ اور انکھی کہانیاں</title>
+    <!-- Firebase SDKs (Compat version for Firestore) -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #121212; color: #e0e0e0; line-height: 1.8; }
+        
+        header { background: #1f1f1f; padding: 15px 20px; display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #333; position: sticky; top: 0; z-index: 100; }
+        .menu-btn { font-size: 24px; background: none; border: none; color: #ff9800; cursor: pointer; }
+        header h1 { color: #ff9800; font-size: 22px; cursor: pointer; }
+
+        .sidebar { height: 100%; width: 0; position: fixed; z-index: 200; top: 0; right: 0; background-color: #1a1a1a; overflow-x: hidden; transition: 0.3s; padding-top: 60px; border-left: 2px solid #333; }
+        .sidebar a { padding: 12px 25px; text-decoration: none; font-size: 18px; color: #f1f1f1; display: block; transition: 0.2s; border-bottom: 1px solid #2a2a2a; }
+        .sidebar a:hover { background: #ff9800; color: #000; }
+        .sidebar .close-btn { position: absolute; top: 15px; left: 20px; font-size: 25px; background: none; border: none; color: #fff; cursor: pointer; }
+
+        .container { max-width: 900px; margin: 20px auto; padding: 15px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; }
+        .card { background: #1e1e1e; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.5); cursor: pointer; transition: 0.3s; border: 1px solid #2a2a2a; position: relative; }
+        .card:hover { transform: translateY(-4px); border-color: #ff9800; }
+        .card img { width: 100%; height: 180px; object-fit: cover; }
+        .card-body { padding: 15px; }
+        .card-body h3 { color: #ff9800; font-size: 18px; margin-bottom: 5px; }
+        .card-body p { color: #aaa; font-size: 14px; }
+        .view-badge { position: absolute; top: 10px; left: 10px; background: rgba(0, 0, 0, 0.7); color: #ff9800; padding: 3px 8px; font-size: 12px; border-radius: 4px; border: 1px solid #ff9800; }
+
+        #reader-view { display: none; background: #1e1e1e; padding: 25px; border-radius: 8px; border: 1px solid #333; }
+        .back-btn { background: #ff9800; color: #000; border: none; padding: 8px 18px; font-weight: bold; border-radius: 4px; cursor: pointer; margin-bottom: 20px; }
+        .story-text { white-space: pre-line; font-size: 17px; color: #dcdcdc; text-align: justify; margin-top: 15px; }
+        
+        .share-box { margin-top: 30px; text-align: center; padding: 15px; background: #252525; border-radius: 6px; }
+        .share-btn { background: #25D366; color: white; border: none; padding: 10px 20px; border-radius: 5px; font-size: 15px; font-weight: bold; cursor: pointer; }
+
+        footer { margin-top: 40px; background: #181818; text-align: center; padding: 25px; border-top: 2px solid #2a2a2a; color: #888; font-size: 14px; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <button class="menu-btn" onclick="openSidebar()">☰</button>
+        <h1 onclick="goBack()" style="cursor: pointer;">داستانِ راز</h1>
+        <div style="width: 24px;"></div>
+    </header>
+
+    <div id="mySidebar" class="sidebar">
+        <button class="close-btn" onclick="closeSidebar()">×</button>
+        <a href="#" onclick="filterCategory('All')">📂 تمام کہانیاں</a>
+        <a href="#" onclick="filterCategory('Warriors')">⚔️ جنگجو اور سلاطین</a>
+        <a href="#" onclick="filterCategory('Mysteries')">🕵️‍♂️ پراسرار راز</a>
+        <a href="#" onclick="filterCategory('Legends')">🐉 ڈارک لیجنڈز</a>
+        <a href="admin.html" onclick="closeSidebar()">⚙️ ایڈمن پینل</a>
+    </div>
+
+    <div class="container">
+        
+        <div id="list-view">
+            <h2 id="category-title" style="margin-bottom: 15px; color: #ff9800; font-size: 20px;">حالیہ داستانیں</h2>
+            <div class="grid" id="stories-grid">
+                <p style="color: #888;">کہانیاں لوڈ ہو رہی ہیں...</p>
+            </div>
+        </div>
+
+        <div id="reader-view">
+            <button class="back-btn" onclick="goBack()">← واپس جائیں</button>
+            <div id="reader-content"></div>
+            <div class="share-box">
+                <p>یہ داستان پسند آئی؟ دوستوں کے ساتھ شیئر کریں!</p>
+                <button class="share-btn" onclick="shareStory()">📤 واٹس ایپ پر شیئر کریں</button>
+            </div>
+        </div>
+
+    </div>
+
+    <footer>
+        <p>داستانِ راز - تمام حقوق محفوظ ہیں</p>
+    </footer>
+
+    <script>
+        // Tera naya Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyCK35nARS_IZoJLv3lupjs9kvxYN1IJWFE",
+            authDomain: "dastan-e-raz.firebaseapp.com",
+            projectId: "dastan-e-raz",
+            storageBucket: "dastan-e-raz.firebasestorage.app",
+            messagingSenderId: "282412106108",
+            appId: "1:282412106108:web:c49390a188ee743565a4f9",
+            measurementId: "G-8YC3S8Q0WJ"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        let allStories = [];
+
+        function fetchStories() {
+            db.collection("stories").orderBy("createdAt", "desc").get().then((querySnapshot) => {
+                allStories = [];
+                querySnapshot.forEach((doc) => {
+                    allStories.push({ id: doc.id, ...doc.data() });
+                });
+                displayStories(allStories);
+            }).catch((error) => {
+                console.error("Error getting documents: ", error);
+                document.getElementById("stories-grid").innerHTML = "<p style='color:red;'>کہانیاں لوڈ کرنے میں مسئلہ پیش آیا ہے۔</p>";
+            });
+        }
+
+        function displayStories(storiesList) {
+            const grid = document.getElementById("stories-grid");
+            grid.innerHTML = "";
+            
+            if(storiesList.length === 0) {
+                grid.innerHTML = "<p style='color:#888;'>کوئی کہانی موجود نہیں ہے۔ ایڈمن پینل سے کہانی اپ لوڈ کریں۔</p>";
+                return;
+            }
+
+            storiesList.forEach(story => {
+                const card = document.createElement("div");
+                card.className = "card";
+                card.onclick = () => openStory(story.id);
+                card.innerHTML = `
+                    <div class="view-badge">👁️ ${story.views || 0}</div>
+                    <img src="${story.image}" alt="Cover">
+                    <div class="card-body">
+                        <h3>${story.title}</h3>
+                        <p>${story.desc}</p>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function openSidebar() { document.getElementById("mySidebar").style.width = "250px"; }
+        function closeSidebar() { document.getElementById("mySidebar").style.width = "0"; }
+
+        function filterCategory(category) {
+            closeSidebar();
+            if(category === 'All') {
+                document.getElementById("category-title").innerText = "حالیہ داستانیں";
+                displayStories(allStories);
+            } else {
+                const filtered = allStories.filter(s => s.category === category);
+                const catNames = { 'Warriors': 'جنگجو اور سلاطین', 'Mysteries': 'پراسرار راز', 'Legends': 'ڈارک لیجنڈز' };
+                document.getElementById("category-title").innerText = "موضوع: " + (catNames[category] || category);
+                displayStories(filtered);
+            }
+        }
+
+        function openStory(id) {
+            const story = allStories.find(s => s.id === id);
+            if(!story) return;
+
+            const storyRef = db.collection("stories").doc(id);
+            storyRef.update({
+                views: firebase.firestore.FieldValue.increment(1)
+            }).catch(err => console.log(err));
+
+            document.getElementById("list-view").style.display = "none";
+            document.getElementById("reader-view").style.display = "block";
+            
+            document.getElementById("reader-content").innerHTML = `
+                <img src="${story.image}" style="width:100%; height:320px; object-fit:cover; border-radius:6px;">
+                <h2 style="color:#ff9800; font-size:26px; margin-top:20px;">${story.title}</h2>
+                <div style="margin: 10px 0; color: #aaa; font-size: 14px;">تعداد مشاہدات (Views): ${(story.views || 0) + 1}</div>
+                <div class="story-text">${story.content}</div>
+            `;
+            window.scrollTo(0,0);
+        }
+
+        function goBack() {
+            document.getElementById("reader-view").style.display = "none";
+            document.getElementById("list-view").style.display = "block";
+            document.getElementById("category-title").innerText = "حالیہ داستانیں";
+            fetchStories();
+            window.scrollTo(0,0);
+        }
+
+        function shareStory() {
+            if (navigator.share) {
+                navigator.share({ title: document.title, url: window.location.href }).catch(() => {});
+            } else {
+                alert("لنک کاپی ہو گیا है!");
+            }
+        }
+
+        fetchStories();
+    </script>
+</body>
+</html>
