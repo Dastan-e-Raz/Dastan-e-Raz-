@@ -29,6 +29,11 @@
         .card-body h3 { color: #ff9800; font-size: 18px; margin-bottom: 5px; }
         .card-body p { color: #aaa; font-size: 14px; }
 
+        /* Loader Animation */
+        #loader { text-align: center; padding: 50px; color: #ff9800; font-size: 18px; }
+        .spinner { border: 4px solid #222; width: 40px; height: 40px; border-radius: 50%; border-left-color: #ff9800; animation: spin 1s linear infinite; margin: 0 auto 15px auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
         #reader-view { display: none; background: #1e1e1e; padding: 25px; border-radius: 8px; border: 1px solid #333; }
         .back-btn { background: #ff9800; color: #000; border: none; padding: 8px 18px; font-weight: bold; border-radius: 4px; cursor: pointer; margin-bottom: 20px; }
         .story-text { white-space: pre-line; font-size: 17px; color: #dcdcdc; text-align: justify; margin-top: 15px; }
@@ -36,14 +41,20 @@
         .share-box { margin-top: 30px; text-align: center; padding: 15px; background: #252525; border-radius: 6px; }
         .share-btn { background: #25D366; color: white; border: none; padding: 10px 20px; border-radius: 5px; font-size: 15px; font-weight: bold; cursor: pointer; }
 
+        /* Custom Toast Notification */
+        #toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(100px); background: #222; color: #ff9800; padding: 12px 25px; border-radius: 6px; border: 1px solid #ff9800; box-shadow: 0 5px 15px rgba(0,0,0,0.5); font-size: 15px; font-weight: bold; transition: 0.4s ease; z-index: 1000; opacity: 0; }
+        #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+
         footer { margin-top: 40px; background: #181818; text-align: center; padding: 25px; border-top: 2px solid #2a2a2a; color: #888; font-size: 14px; }
     </style>
 </head>
 <body>
 
+    <div id="toast">لنک کاپی ہو گیا!</div>
+
     <header>
         <button class="menu-btn" onclick="openSidebar()">☰</button>
-        <h1 onclick="goBack()" style="cursor: pointer;">داستانِ راز</h1>
+        <h1 onclick="goHome()" style="cursor: pointer;">داستانِ راز</h1>
         <div style="width: 24px;"></div>
     </header>
 
@@ -53,20 +64,25 @@
         <a href="#" onclick="filterCategory('Warriors')">⚔️ جنگجو اور سلاطین</a>
         <a href="#" onclick="filterCategory('Mysteries')">🕵️‍♂️ پراسرار راز</a>
         <a href="#" onclick="filterCategory('Legends')">🐉 ڈارک لیجنڈز</a>
+        <a href="#" onclick="filterCategory('Romantic')">💖 رومانوی کہانیاں</a>
+        <a href="#" onclick="filterCategory('Horror')">👻 خوفناک کہانیاں</a>
         <a href="admin.html" onclick="closeSidebar()">⚙️ ایڈمن پینل</a>
     </div>
 
     <div class="container">
         
-        <div id="list-view">
+        <div id="loader">
+            <div class="spinner"></div>
+            داستانیں لوڈ ہو رہی ہیں، براہ کرم انتظار کریں...
+        </div>
+
+        <div id="list-view" style="display: none;">
             <h2 id="category-title" style="margin-bottom: 15px; color: #ff9800; font-size: 20px;">حالیہ داستانیں</h2>
-            <div class="grid" id="stories-grid">
-                <p style="color: #888;">کہانیاں لوڈ ہو رہی ہیں...</p>
-            </div>
+            <div class="grid" id="stories-grid"></div>
         </div>
 
         <div id="reader-view">
-            <button class="back-btn" onclick="goBack()">← واپس جائیں</button>
+            <button class="back-btn" onclick="goHome()">← واپس جائیں</button>
             <div id="reader-content"></div>
             <div class="share-box">
                 <p>یہ داستان پسند آئی؟ دوستوں کے ساتھ شیئر کریں!</p>
@@ -95,6 +111,14 @@
         const db = firebase.firestore();
 
         let allStories = [];
+        let currentStoryId = null;
+
+        function showToast(message) {
+            const toast = document.getElementById("toast");
+            toast.innerText = message;
+            toast.className = "show";
+            setTimeout(() => { toast.className = ""; }, 3000);
+        }
 
         function fetchStories() {
             db.collection("stories").orderBy("createdAt", "desc").get().then((querySnapshot) => {
@@ -102,10 +126,21 @@
                 querySnapshot.forEach((doc) => {
                     allStories.push({ id: doc.id, ...doc.data() });
                 });
-                displayStories(allStories);
+                
+                document.getElementById("loader").style.display = "none";
+                document.getElementById("list-view").style.display = "block";
+
+                // Check if URL has a specific story ID to open directly
+                const urlParams = new URLSearchParams(window.location.search);
+                const storyIdFromUrl = urlParams.get('story');
+                if (storyIdFromUrl) {
+                    openStory(storyIdFromUrl, false);
+                } else {
+                    displayStories(allStories);
+                }
             }).catch((error) => {
                 console.error("Error getting documents: ", error);
-                document.getElementById("stories-grid").innerHTML = "<p style='color:red;'>کہانیاں لوڈ کرنے میں مسئلہ پیش آیا ہے۔</p>";
+                document.getElementById("loader").innerHTML = "<p style='color:red;'>کہانیاں لوڈ کرنے میں مسئلہ پیش آیا ہے۔ پیج ریفریش کریں۔</p>";
             });
         }
 
@@ -121,7 +156,7 @@
             storiesList.forEach(story => {
                 const card = document.createElement("div");
                 card.className = "card";
-                card.onclick = () => openStory(story.id);
+                card.onclick = () => openStory(story.id, true);
                 card.innerHTML = `
                     <img src="${story.image}" alt="Cover">
                     <div class="card-body">
@@ -138,27 +173,48 @@
 
         function filterCategory(category) {
             closeSidebar();
+            // Clear URL param when switching categories
+            if(history.pushState) {
+                history.pushState(null, null, window.location.pathname);
+            }
+            
             if(category === 'All') {
                 document.getElementById("category-title").innerText = "حالیہ داستانیں";
                 displayStories(allStories);
             } else {
                 const filtered = allStories.filter(s => s.category === category);
-                const catNames = { 'Warriors': 'جنگجو اور سلاطین', 'Mysteries': 'پراسرار راز', 'Legends': 'ڈارک لیجنڈز' };
+                const catNames = { 
+                    'Warriors': 'جنگجو اور سلاطین', 
+                    'Mysteries': 'پراسرار راز', 
+                    'Legends': 'ڈارک لیجنڈز',
+                    'Romantic': 'رومانوی کہانیاں',
+                    'Horror': 'خوفناک کہانیاں'
+                };
                 document.getElementById("category-title").innerText = "موضوع: " + (catNames[category] || category);
                 displayStories(filtered);
             }
         }
 
-        function openStory(id) {
+        function openStory(id, updateUrl = true) {
             const story = allStories.find(s => s.id === id);
-            if(!story) return;
+            if(!story) {
+                if(updateUrl) showToast("کہانی نہیں ملی!");
+                return;
+            }
 
-            // Increment views in database secretly without showing to user
-            const storyRef = db.collection("stories").doc(id);
-            storyRef.update({
+            currentStoryId = id;
+
+            if(updateUrl) {
+                const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname + '?story=' + id;
+                window.history.pushState({path: newUrl}, '', newUrl);
+            }
+
+            // Increment views in database secretly
+            db.collection("stories").doc(id).update({
                 views: firebase.firestore.FieldValue.increment(1)
             }).catch(err => console.log(err));
 
+            document.getElementById("loader").style.display = "none";
             document.getElementById("list-view").style.display = "none";
             document.getElementById("reader-view").style.display = "block";
             
@@ -170,19 +226,26 @@
             window.scrollTo(0,0);
         }
 
-        function goBack() {
+        function goHome() {
+            currentStoryId = null;
+            if(history.pushState) {
+                history.pushState(null, null, window.location.pathname);
+            }
             document.getElementById("reader-view").style.display = "none";
             document.getElementById("list-view").style.display = "block";
             document.getElementById("category-title").innerText = "حالیہ داستانیں";
-            fetchStories();
+            displayStories(allStories);
             window.scrollTo(0,0);
         }
 
         function shareStory() {
+            const shareUrl = window.location.href;
             if (navigator.share) {
-                navigator.share({ title: document.title, url: window.location.href }).catch(() => {});
+                navigator.share({ title: document.title, url: shareUrl }).catch(() => {});
             } else {
-                alert("لنک کاپی ہو گیا ہے!");
+                navigator.clipboard.writeText(shareUrl).then(() => {
+                    showToast("کہانی کا خاص لنک کاپی ہو گیا!");
+                });
             }
         }
 
